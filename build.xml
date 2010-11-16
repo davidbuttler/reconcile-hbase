@@ -1,0 +1,487 @@
+<project name="reconcile-hbase" default="compile" basedir="." >
+
+	<description>Code to interact with hbase</description>
+
+	<import file="../ant-maven-build/build.xml"/>
+	
+	<!--  =================================================================== -->
+	<!--  run targets                     -->
+	<!--  =================================================================== -->
+	<target name="createDocSchema" depends="compile" description="create the doc table">
+		<echo>HBASE_HOME: ${env.HBASE_HOME}</echo>
+		<java fork="yes" classname="reconcile.hbase.table.DocSchema" failonerror="true">
+			<classpath refid="classpath" />
+		</java>
+	</target>
+
+	<target name="createEntitySchema" depends="compile">
+		<java fork="yes" classname="reconcile.hbase.table.EntitySchema" failonerror="true">
+			<classpath refid="classpath" />
+		</java>
+	</target>
+
+	<target name="createDisambigSchema" depends="compile">
+		<java fork="yes" classname="reconcile.hbase.table.DisambiguatedEntitySchema" failonerror="true">
+			<classpath refid="classpath" />
+		</java>
+	</target>
+
+	<target name="scanTable" depends="compile">
+		<echo>table name: ${table}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.ScanTable" failonerror="true" classpathref="classpath">
+			<jvmarg value="-Xmx2048m" />
+			<arg value="${table}" />
+		</java>
+	</target>
+
+	<target name="showRows" depends="compile" description="show the row keys for a given column qualifier. params: table, col, qual">
+		<echo>table name: ${table}</echo>
+		<echo>col name: ${col}</echo>
+		<echo>qual name: ${qual}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.ShowRows" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${qual}" />
+		</java>
+	</target>
+	
+	<target name="measureRowSize" depends="compile" description="get histogram of row sizes for table. params: table, tick">
+		<echo>table name: ${table}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.MeasureRowSizeDistribution" failonerror="true">
+			<jvmarg value="-Xmx8g" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${tick}" />
+		</java>
+	</target>
+	<target name="measureFamilySize" depends="compile" description="get histogram of row sizes for table. params: table, col, tick">
+		<echo>table name: ${table}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.MeasureFamilySizeDistribution" failonerror="true">
+			<jvmarg value="-Xmx8g" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${tick}" />
+		</java>
+	</target>
+	<target name="measureQualSize" depends="compile" description="get histogram of row sizes for table. params: table, col, qual, tick">
+		<echo>table name: ${table}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.MeasureQualifierSizeDistribution" failonerror="true">
+			<jvmarg value="-Xmx8g" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${qual}" />
+			<arg value="${tick}" />
+		</java>
+	</target>
+
+	<target name="deleteContents" depends="compile">
+		<echo>table name: ${table}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.DeleteContents" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+		</java>
+	</target>
+	<target name="deleteColumn" depends="compile">
+		<echo>table name: ${table}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.DeleteColumn" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${qual}" />
+		</java>
+	</target>
+
+	<target name="countRows" depends="compile">
+		<echo>table name: ${table}</echo>
+		<echo>column name: ${col}</echo>
+		<echo>qual name: ${qual}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.CountRows" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${qual}" />
+		</java>
+	</target>
+
+	<target name="countVals" depends="compile" description="count the values of a particular column. params: table; col; qual">
+		<echo>table name: ${table}</echo>
+		<echo>column name: ${col}</echo>
+		<echo>qual name: ${qual}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.CountColumnValues" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${qual}" />
+		</java>
+	</target>
+
+	<target name="scanQuals" depends="compile" description="scan the column qualifiers in a family.  Ends with a count of each qual. params: table; col">
+		<echo>hbase home: ${env.HBASE_HOME}</echo>
+		<echo>hbase home: ${env.HBASE_HOME}/conf</echo>
+		<echo>hbase home: ${env.HBASE_HOME}/conf/hbase-site.xml</echo>
+		<echo>table name: ${table}</echo>
+		<echo>column name: ${col}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.ScanColumnQualifiers" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+		</java>
+	</target>
+
+	<target name="getRow" depends="compile">
+		<echo>table name: ${table}</echo>
+		<echo>rowKey: ${row}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.GetRow" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${row}" />
+		</java>
+	</target>
+
+	<target name="countRowsWithColumn" depends="compile">
+		<echo>table name: ${table}</echo>
+		<echo>column name: ${col}</echo>
+		<echo>qual name: ${qual}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.CountRowsWithColumn" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${qual}" />
+		</java>
+	</target>
+
+	<target name="countRowsWithOutColumn" depends="compile">
+		<echo>table name: ${table}</echo>
+		<echo>column name: ${col}</echo>
+		<echo>qual name: ${qual}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.CountRowsWithEmptyColumn" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+			<arg value="${qual}" />
+		</java>
+	</target>
+
+	<target name="scanColumn" depends="compile">
+		<echo>table name: ${table}</echo>
+		<echo>column name: ${col}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.ScanColumn" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="-fetch=${col}" />
+		</java>
+	</target>
+
+	<target name="scanColumnQualifier" depends="compile">
+		<echo>table name: ${table}</echo>
+		<echo>column family: ${col}</echo>
+		<echo>column qualifier: ${qual}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.ScanColumn" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="-fetch=${col}:${qual}" />
+		</java>
+	</target>
+
+	<target name="scanColumnQualifierValue" depends="compile">
+		<echo>table name: ${table}</echo>
+		<echo>column family: ${col}</echo>
+		<echo>column filterFamily: ${filterFamily}</echo>
+		<echo>column filterColumn: ${filterColumn}</echo>
+		<echo>column filterValue: ${filterValue}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.ScanColumn" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${table}" />
+			<arg value="-fetch=${col}" />
+			<arg value="-filter=${filterFamily}:${filterColumn}:${filterValue}" />
+			<arg value="-numRows=5" />
+			<!-- number of rows to print -->
+		</java>
+	</target>
+
+	<!-- ========================== Ingest targets =============================== -->
+	<target name="loadCorpus" depends="compile">
+		<echo>input corpus dir: ${input}</echo>
+		<echo>source name: ${src}</echo>
+		<java fork="yes" classname="reconcile.hbase.ingest.CorpusLoader" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${src}" />
+			<arg value="${input}" />
+		</java>
+	</target>
+
+	<target name="loadHBase" depends="compile">
+		<echo>input corpus dir: ${input}</echo>
+		<echo>source name: ${src}</echo>
+		<java fork="yes" classname="reconcile.hbase.SequenceLoader" failonerror="true">
+			<jvmarg value="-Xmx2048m" />
+			<classpath refid="classpath" />
+			<arg value="${src}" />
+			<arg value="${input}" />
+		</java>
+	</target>
+
+	<target name="ingestNYT" depends="jars" description="M/R job to ingest NYT">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.mapreduce.ingest.ImportNYT" />
+			<!-- table -->
+			<arg value="/data/nyt_dvd/fileList" />
+			<arg value="NYT" />
+		</exec>
+	</target>
+
+	<!-- =================================================================== -->
+	<!-- m/r query tasks -->
+	<!-- =================================================================== -->
+	<target name="countRowsMR" depends="jars" description="M/R job to count qualifiers. Params: table">
+		<echo>table: ${table} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.CountRows" />
+			<!-- table -->
+			<arg value="${table}" />
+		</exec>
+	</target>
+	<target name="sizeRowsMR" depends="jars" description="M/R job to count size of rows. Params: table">
+		<echo>table: ${table} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.SizeRows" />
+			<!-- table -->
+			<arg value="${table}" />
+		</exec>
+	</target>
+	<target name="sizeCF" depends="jars" description="M/R job to count size of a column family. Params: table, col">
+		<echo>table: ${table} </echo>
+		<echo>column: ${col} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.SizeColumnFamily" />
+			<!-- table -->
+			<arg value="${table}" />
+			<arg value="${col}" />
+		</exec>
+	</target>
+
+	<target name="countQualRowsMR" depends="jars" description="M/R job to count qualifiers. Params: table; col; qual">
+		<echo>table: ${table} </echo>
+		<echo>column: ${col} </echo>
+		<echo>qualifier: ${qual} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.CountQualifiers" />
+			<!-- table -->
+			<arg value="${table}" />
+			<!-- column -->
+			<arg value="${col}" />
+			<!-- qualifier -->
+			<arg value="${qual}" />
+		</exec>
+	</target>
+
+	<target name="deleteRowsMR" depends="hadoopJar">
+		<!-- description="M/R job to delete rows with key OSC:" -->
+		<echo>Filter Source : ${src}</echo>
+		<echo>Filter HDFS Key List File : ${keyList}</echo>
+		<echo>Delete column families : ${cf} [if empty all]</echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="reconcile.hbase.query.mr.DeleteRows" />
+			<arg value="-source=${src}" />
+			<arg value="-keyList=${keyList}" />
+			<arg value="-cf=${cf}"/>
+		</exec>
+	</target>
+
+	<target name="deleteLargeCF" depends="jars">
+		<!-- description="M/R job to delete rows with key OSC:" -->
+		<echo>table: ${table} </echo>
+		<echo>column: ${col} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.DeleteLargeColumnFamily" />
+			<arg value="${table}" />
+			<arg value="${col}" />
+		</exec>
+	</target>
+
+	<target name="countValsMR" depends="jars" description="M/R job to count qualifier values. Params: table; col; qual">
+		<echo>table: ${table} </echo>
+		<echo>column: ${col} </echo>
+		<echo>qualifier: ${qual} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.CountQualifierValues" />
+			<!-- table -->
+			<arg value="${table}" />
+			<!-- column -->
+			<arg value="${col}" />
+			<!-- qualifier -->
+			<arg value="${qual}" />
+		</exec>
+	</target>
+
+	<target name="scanQualsMR" depends="jars" description="M/R job to count qualifiers. Params: table; col">
+		<echo>table: ${table} </echo>
+		<echo>column: ${col} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.ScanQualifiers" />
+			<!-- table -->
+			<arg value="${table}" />
+			<!-- column -->
+			<arg value="${col}" />
+		</exec>
+	</target>
+
+	<target name="scanQualsWithSrcMR" depends="jars" description="M/R job to count qualifiers of a given source. Params: table; col; src">
+		<echo>table: ${table} </echo>
+		<echo>column: ${col} </echo>
+		<echo>source: ${src} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.ScanQualifiersWithSrc" />
+			<!-- table -->
+			<arg value="${table}" />
+			<!-- column -->
+			<arg value="${col}" />
+			<!-- source -->
+			<arg value="${src}" />
+		</exec>
+	</target>
+	<!-- ======================================================= -->
+	<!-- annotation tasks -->
+	<!-- ======================================================= -->
+	<target name="baseAnnot" depends="hadoopJar" description="execute base NLP annotations over entire doc table">
+		<echo>Filter Source : ${src}</echo>
+		<echo>Filter HDFS Key List File : ${keyList}</echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="reconcile.hbase.mapreduce.annotation.BaseReconcileAnnotation" />
+			<arg value="-source=${src}"/>
+			<arg value="-keyList=${keyList}" />
+		</exec>
+		<sleep seconds="10" />
+		<exec executable="${hadoop}">
+			<arg value="job" />
+			<arg value="-list" />
+		</exec>
+	</target>
+
+	<target name="parAnnot" depends="hadoopJar" description="paragraph annotations over entire doc table">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="trinidad.hbase.mapreduce.annotation.ParagraphAnnotation" />
+		</exec>
+	</target>
+	<target name="sentAnnot" depends="hadoopJar" description="sentence annotations over entire doc table">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="trinidad.hbase.mapreduce.annotation.SentenceAnnotation" />
+		</exec>
+	</target>
+	<target name="tokenAnnot" depends="hadoopJar" description="token annotations over entire doc table">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="trinidad.hbase.mapreduce.annotation.TokenAnnotation" />
+		</exec>
+	</target>
+	<target name="posAnnot" depends="hadoopJar" description="POS annotations over entire doc table">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="trinidad.hbase.mapreduce.annotation.POSAnnotation" />
+		</exec>
+	</target>
+
+	<target name="neAnnot" depends="hadoopJar" description="execute named entity annotations over  doc table">
+		<echo>Filter Source : ${src}</echo>
+		<echo>Filter HDFS Key List File : ${keyList}</echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="reconcile.hbase.mapreduce.annotation.NEAnnotation" />
+			<arg value="-source=${src}"/>
+			<arg value="-keyList=${keyList}" />
+		</exec>
+	</target>
+
+	<target name="parserAnnot" depends="hadoopJar" description="execute parser annotations over doc table ">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="reconcile.hbase.mapreduce.annotation.ParserAnnotation" />
+			<arg value="-source=${src}" />
+			<arg value="-keyList=${keyList}" />
+		</exec>
+	</target>
+
+	<target name="bnpAnnot" depends="hadoopJar" description="execute base NP annotations over doc table ">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="reconcile.hbase.mapreduce.annotation.BaseNPAnnotation" />
+			<arg value="-source=${src}" />
+			<arg value="-keyList=${keyList}" />
+		</exec>
+	</target>
+
+	<target name="corefAnnot" depends="hadoopJar" description="execute coref annotations over doc table ">
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="reconcile.hbase.mapreduce.annotation.CorefResolver" />
+			<arg value="-source=${src}" />
+			<arg value="-keyList=${keyList}" />
+		</exec>
+	</target>
+
+	<target name="annotate" depends="hadoopJar" description="Run all neccessary annotators">
+		<echo>Source name: ${src}</echo>
+		<echo>Key List File: ${keyList}</echo>
+		<antcall target="baseAnnot"/>
+		<antcall target="neAnnot"/>
+		<antcall target="parserAnnot"/>
+		<antcall target="bnpAnnot"/>
+		<antcall target="featureAnnot"/>
+
+	</target>
+
+	<target name="testZipInputFormat">
+		<antcall target="hadoopTest">
+			<param name="input" value="reconcile.hbase.mapreduce.ZipInputFormatTests"/>
+		</antcall>
+	</target>
+	
+</project>
