@@ -72,7 +72,7 @@ public int run(String[] args)
     System.out.println("usage: SizeColumnFamily <table name> <sourceName>");
     return 1;
   }
-  HBaseConfiguration conf = new HBaseConfiguration();
+  Configuration conf = HBaseConfiguration.create();
 
   try {
     String tableName = args[0];
@@ -113,9 +113,10 @@ public static class DeleteRowMapper
 String sourceName;
 
 private HTable table;
-private static final int ONE_K = 1024;
 
-private static final int ONE_M = ONE_K * ONE_K;
+public static final int ONE_K = 1024;
+
+public static final int ONE_M = ONE_K * ONE_K;
 
 @Override
 public void setup(Context context)
@@ -125,8 +126,8 @@ public void setup(Context context)
     sourceName = context.getConfiguration().get(SOURCE_NAME);
 
     String tableName = context.getConfiguration().get(TABLE_NAME);
-    HBaseConfiguration config = new HBaseConfiguration();
-    table = new HTable(config, tableName.getBytes());
+    Configuration conf = HBaseConfiguration.create();
+    table = new HTable(conf, tableName.getBytes());
   }
   catch (IOException e) {
     e.printStackTrace();

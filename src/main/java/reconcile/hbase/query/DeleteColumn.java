@@ -14,6 +14,7 @@ package reconcile.hbase.query;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -61,7 +62,7 @@ public static void main(String[] args)
       filterValue = args[4];
     }
 
-    HBaseConfiguration conf = new HBaseConfiguration();
+    Configuration conf = HBaseConfiguration.create();
     HBaseAdmin admin = new HBaseAdmin(conf);
     if (!admin.tableExists(tableName.getBytes())) {
       System.out.println("table does not exist: " + tableName);
@@ -74,7 +75,7 @@ public static void main(String[] args)
     Scan s = null;
     if (columnQualifer == null) {
       s = new Scan();
-      s.addColumn(Bytes.toBytes(columnFamily));
+      s.addFamily(Bytes.toBytes(columnFamily));
     }
     else {
       s = new Scan();

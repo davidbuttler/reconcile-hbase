@@ -67,7 +67,7 @@ public int run(String[] args)
     System.out.println("usage: SizeRows <table name>");
     return 1;
   }
-  HBaseConfiguration conf = new HBaseConfiguration();
+  Configuration conf = HBaseConfiguration.create();
 
   try {
     String tableName = args[0];

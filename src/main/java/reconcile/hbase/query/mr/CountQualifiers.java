@@ -78,7 +78,7 @@ public int run(String[] args)
     System.out.println("usage: CountRows <table name> <column name> <column qualifier>");
     return 1;
   }
-  HBaseConfiguration conf = new HBaseConfiguration();
+  Configuration conf = HBaseConfiguration.create();
 
   try {
     table = args[0];

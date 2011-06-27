@@ -10,7 +10,9 @@ public class JobConfigTest extends TestCase
 	static String FOO="foo";
 	static String BAR="bar";
 	static String FOOBAR=FOO+BAR;
-
+	static String KEY="thisismykey";
+	static String STOPKEY="thisismystopkey";
+	
 	public void testSourceArg()
 	{
 		String[] args = { JobConfig.SOURCE_ARG+FOO };
@@ -32,11 +34,27 @@ public class JobConfigTest extends TestCase
 		Assert.assertEquals(FOO, jobConfig.getTableName());
 	}
 
+	public void testStartRowArg()
+	{
+		String[] args = { JobConfig.START_ROW_ARG+KEY };
+		JobConfig jobConfig = new JobConfig(args);
+		Assert.assertEquals(KEY, jobConfig.getStartRow());
+	}
+
+	public void testStopRowArg()
+	{
+		String[] args = { JobConfig.STOP_ROW_ARG+STOPKEY };
+		JobConfig jobConfig = new JobConfig(args);
+		Assert.assertEquals(STOPKEY, jobConfig.getStopRow());
+	}
+
 	public void testAllArgs()
 	{
 		String[] args = { JobConfig.SOURCE_ARG+FOO,
 				JobConfig.KEY_LIST_ARG+BAR,
-				JobConfig.TABLE_ARG+FOOBAR
+				JobConfig.TABLE_ARG+FOOBAR,
+				JobConfig.START_ROW_ARG+KEY,
+				JobConfig.STOP_ROW_ARG+STOPKEY
 		};
 
 		JobConfig jobConfig = new JobConfig(args);
@@ -44,6 +62,8 @@ public class JobConfigTest extends TestCase
 		Assert.assertEquals(FOO, jobConfig.getSource());
 		Assert.assertEquals(BAR, jobConfig.getKeyListFile());
 		Assert.assertEquals(FOOBAR, jobConfig.getTableName());
+		Assert.assertEquals(KEY, jobConfig.getStartRow());
+		Assert.assertEquals(STOPKEY, jobConfig.getStopRow());
 	}
 
 	public void testAllButTableArgs()

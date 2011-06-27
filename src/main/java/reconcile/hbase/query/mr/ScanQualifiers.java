@@ -13,7 +13,10 @@
 package reconcile.hbase.query.mr;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Arrays;
+//import java.util.Map;
+import java.util.NavigableMap;
 import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
@@ -21,7 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HConstants;
+//import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
@@ -29,6 +32,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.IdentityTableReducer;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -42,11 +46,9 @@ private static final Log LOG = LogFactory.getLog(ScanQualifiers.class);
 
 private static final String TABLE_NAME = "query.table_name";
 
-private static final String COLUMN_FAMILY = "query.column_family";
+//private static final String COLUMN_FAMILY = "query.column_family";
 
 private String table = "example";
-
-private String columnFamily;
 
 
 /**
@@ -70,29 +72,36 @@ public static void main(String[] args)
 
 }
 
+private ArrayList<String> columnFamilies = new ArrayList<String>();
+
 public int run(String[] args)
     throws Exception
 {
-  if (args.length != 2) {
-    System.out.println("usage: ScanQualifiers <table name> <column name> ");
+  if (args.length < 2) {
+    System.out.println("usage: ScanQualifiers <table name> <column name>...<column name 2> ");
 
     return 1;
   }
-  HBaseConfiguration conf = new HBaseConfiguration();
+  Configuration conf = HBaseConfiguration.create();
 
   try {
     table = args[0];
-    columnFamily = args[1];
+    
+    for (int i=1; i<args.length; ++i) {
+    	columnFamilies.add(args[i]);
+    }
     Job job = null;
     LOG.info("Before map/reduce startup");
-    job = new Job(conf, "query: count qualifier values");
+    job = new Job(conf, "query: count qualifier values ("+Arrays.toString(args)+")");
     job.setJarByClass(ScanQualifiers.class);
     job.setNumReduceTasks(1);
     job.getConfiguration().set(TABLE_NAME, table);
-    job.getConfiguration().set(COLUMN_FAMILY, columnFamily);
+    //job.getConfiguration().set(COLUMN_FAMILY, columnFamily);
 
     Scan scan = new Scan();
-    scan.addFamily(columnFamily.getBytes());
+    for (String columnFamily : columnFamilies) {
+    	scan.addFamily(columnFamily.getBytes());
+    }
     TableMapReduceUtil.initTableMapperJob(table, scan, CountRowMapper.class, ImmutableBytesWritable.class,
         Put.class, job);
     TableMapReduceUtil.initTableReducerJob(table, IdentityTableReducer.class, job);
@@ -114,7 +123,7 @@ public int run(String[] args)
 public static class CountRowMapper
     extends TableMapper<ImmutableBytesWritable, Put> {
 
-private String columnFamily;
+//private String columnFamily;
 
 
 public static final Pattern pTab = Pattern.compile("\\t");
@@ -124,8 +133,7 @@ public void setup(Context context)
 {
   try {
     super.setup(context);
-
-    columnFamily = context.getConfiguration().get(COLUMN_FAMILY);
+    //columnFamily = context.getConfiguration().get(COLUMN_FAMILY);
   }
   catch (IOException e) {
     e.printStackTrace();
@@ -154,11 +162,22 @@ public void setup(Context context)
 public void map(ImmutableBytesWritable key, Result row, Context context)
     throws IOException, InterruptedException
 {
-  Map<byte[], byte[]> map = row.getFamilyMap(columnFamily.getBytes());
-  for (byte[] k : map.keySet()) {
-    String v = new String(k, HConstants.UTF8_ENCODING);
-    context.getCounter("CountVals", v).increment(1);
-  }
+	NavigableMap<byte[], NavigableMap<byte[],byte[]>> map = row.getNoVersionMap();
+	for (byte[] colFamily : map.keySet())
+	{
+		String family = Bytes.toString(colFamily);
+		NavigableMap<byte[], byte[]> qualMap = map.get(colFamily);
+		for (byte[] colQual : qualMap.keySet()) 
+		{	
+			String qualifier = Bytes.toString(colQual);
+			context.getCounter("CountVals", family+":"+qualifier).increment(1);
+		}
+	}
+	//Map<byte[], byte[]> map = row.getFamilyMap(columnFamily.getBytes());
+	//for (byte[] k : map.keySet()) {
+	//  String v = new String(k, HConstants.UTF8_ENCODING);
+	//  context.getCounter("CountVals", v).increment(1);
+	// }
 }
 
 

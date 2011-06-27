@@ -1,10 +1,5 @@
 package reconcile.hbase.mapreduce.parse;
 
-import static reconcile.hbase.table.DocSchema.srcCF;
-import static reconcile.hbase.table.DocSchema.srcName;
-import static reconcile.hbase.table.DocSchema.textCF;
-import static reconcile.hbase.table.DocSchema.textOrig;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -48,7 +43,7 @@ public class ParseNYT
 
 static final Log LOG = LogFactory.getLog(ParseNYT.class);
 
-public static final String WoS_PARSER_SOURCE = "NYT_Parser_Source";
+public static final String NYT_PARSER_SOURCE = "NYT_Parser_Source";
 
 // private static final DateFormat formatId = new SimpleDateFormat("yyyy-MM-dd_HH_mm_ss.SSS");
 
@@ -73,7 +68,8 @@ public static void main(String[] args)
 }
 
 private static String tableName = "NYT";
-private HBaseConfiguration conf;
+
+private Configuration conf;
 
 public ParseNYT() {
 
@@ -81,7 +77,7 @@ public ParseNYT() {
 
 public int run(String[] args)
 {
-  conf = new HBaseConfiguration();
+  conf = HBaseConfiguration.create();
   // important to switch spec exec off.
   // We don't want to have something duplicated.
   conf.set("mapred.map.tasks.speculative.execution", "false");
@@ -94,9 +90,10 @@ public int run(String[] args)
     job.setJarByClass(ParseNYT.class);
     Scan scan = new Scan();
     scan.addColumn(DocSchema.srcCF.getBytes(), DocSchema.srcName.getBytes());
-    scan.addFamily(textCF.getBytes());
+    scan.addFamily(DocSchema.textCF.getBytes());
     scan
-        .setFilter(new SingleColumnValueFilter(srcCF.getBytes(), srcName.getBytes(), CompareOp.EQUAL, "NYT"
+.setFilter(new SingleColumnValueFilter(DocSchema.srcCF.getBytes(), DocSchema.srcName.getBytes(),
+        CompareOp.EQUAL, "NYT"
         .getBytes()));
 
     TableMapReduceUtil.initTableMapperJob(tableName, scan, NYTParserMapper.class, ImmutableBytesWritable.class,
@@ -183,7 +180,7 @@ public void map(ImmutableBytesWritable mapKey, Result row, Context context)
     progress = ReportProgressThread.start(context, 1000);
     context.getCounter("Parse NYT", "map").increment(1L);
 
-    String orig = DocSchema.getColumn(row, textCF, textOrig);
+    String orig = DocSchema.getColumn(row, DocSchema.textCF, DocSchema.textOrig);
     if (orig == null) {
       context.getCounter("Parse NYT", "skip -- null text: " + src).increment(1L);
       return;

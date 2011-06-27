@@ -62,7 +62,7 @@ public static void main(String[] args)
 
 }
 
-private HBaseConfiguration conf;
+private Configuration conf;
 
 private static String tableName = "NYT";
 
@@ -73,7 +73,7 @@ public ImportNYT() {
 public int run(String[] args)
 {
   String inputPath = args[0];
-  conf = new HBaseConfiguration();
+  conf = HBaseConfiguration.create();
   conf.set(PARSER_SOURCE, args[1]);
   // important to switch spec exec off.
   // We don't want to have something duplicated.

@@ -2,15 +2,19 @@
 
 	<description>Code to interact with hbase</description>
 
-	<import file="../ant-maven-build/build.xml"/>
+	<property name="antMavenBuildDir" value="../ant-maven-build"/>
+	<import file="${antMavenBuildDir}/build.xml"/>
 	
-	<!--  =================================================================== -->
-	<!--  run targets                     -->
-	<!--  =================================================================== -->
+
+<!--  =================================================================== -->
+<!--  run targets                     -->
+<!--  =================================================================== -->
 	<target name="createDocSchema" depends="compile" description="create the doc table">
 		<echo>HBASE_HOME: ${env.HBASE_HOME}</echo>
+		<echo>table name: ${table}</echo>
 		<java fork="yes" classname="reconcile.hbase.table.DocSchema" failonerror="true">
 			<classpath refid="classpath" />
+			<arg value="${table}" />
 		</java>
 	</target>
 
@@ -31,6 +35,15 @@
 		<java fork="yes" classname="reconcile.hbase.query.ScanTable" failonerror="true" classpathref="classpath">
 			<jvmarg value="-Xmx2048m" />
 			<arg value="${table}" />
+		</java>
+	</target>
+
+	<target name="countTableRegions" depends="compile">
+		<echo>table name: ${table}</echo>
+		<java fork="yes" classname="reconcile.hbase.table.DocSchema" failonerror="true" classpathref="classpath">
+			<jvmarg value="-Xmx2048m" />
+			<arg value="${table}" />
+			<arg value="-getRegionCount"/>
 		</java>
 	</target>
 
@@ -148,16 +161,14 @@
 		</java>
 	</target>
 
-	<target name="countRowsWithColumn" depends="compile">
+	<target name="countAnnotations" depends="compile" description="count annotation strings. params: table, annot">
 		<echo>table name: ${table}</echo>
-		<echo>column name: ${col}</echo>
-		<echo>qual name: ${qual}</echo>
-		<java fork="yes" classname="reconcile.hbase.query.CountRowsWithColumn" failonerror="true">
+		<echo>annotation name: ${annot}</echo>
+		<java fork="yes" classname="reconcile.hbase.query.CountAnnotationValues" failonerror="true">
 			<jvmarg value="-Xmx2048m" />
 			<classpath refid="classpath" />
 			<arg value="${table}" />
-			<arg value="${col}" />
-			<arg value="${qual}" />
+			<arg value="${annot}" />
 		</java>
 	</target>
 
@@ -248,19 +259,50 @@
 		</exec>
 	</target>
 
-	<!-- =================================================================== -->
-	<!-- m/r query tasks -->
-	<!-- =================================================================== -->
-	<target name="countRowsMR" depends="jars" description="M/R job to count qualifiers. Params: table">
-		<echo>table: ${table} </echo>
+	<target name="parseNYT" depends="jars" description="M/R job to ingest NYT">
 		<exec executable="${hadoop}" spawn="false">
 			<arg value="jar" />
 			<arg value="${depJarFile}" />
-			<arg value="reconcile.hbase.query.mr.CountRows" />
+			<arg value="reconcile.hbase.mapreduce.parse.ParseNYT" />
 			<!-- table -->
-			<arg value="${table}" />
+			<arg value="/data/nyt_dvd/fileList" />
+			<arg value="NYT" />
 		</exec>
 	</target>
+	
+	<!-- =================================================================== -->
+	<!-- m/r query tasks -->
+	<!-- =================================================================== -->
+
+	<target name="countRowsMR" depends="jars" description="M/R job to count qualifiers. Params: table">
+<echo>table: ${table} </echo>
+<exec executable="${hadoop}" spawn="false">
+	<arg value="jar" />
+	<arg value="${depJarFile}" />
+	<arg value="reconcile.hbase.query.mr.CountRows" />
+	<!-- table -->
+	<arg value="${table}" />
+</exec>
+</target>
+
+	<target name="countRowsRegex" depends="jars" description="M/R job to count rows matching the given pattern. Params: table, col, qual, pattern">
+		<echo>table: ${table} </echo>
+		<echo>col: ${col} </echo>
+		<echo>qual: ${qual} </echo>
+		<echo>pattern: ${pattern} </echo>
+<exec executable="${hadoop}" spawn="false">
+	<arg value="jar" />
+	<arg value="${depJarFile}" />
+	<arg value="reconcile.hbase.query.mr.CountRowsWithRegexMatch" />
+	<!-- table -->
+	<arg value="${table}" />
+	<arg value="${col}" />
+	<arg value="${qual}" />
+		<arg value="${pattern}" />
+</exec>
+</target>
+
+	
 	<target name="sizeRowsMR" depends="jars" description="M/R job to count size of rows. Params: table">
 		<echo>table: ${table} </echo>
 		<exec executable="${hadoop}" spawn="false">
@@ -301,6 +343,19 @@
 		</exec>
 	</target>
 
+	<target name="deleteIngest" depends="hadoopJar">
+		<!-- description="M/R job to delete columns that look like dates in meta" -->
+		<echo>Filter Source : ${src}</echo>
+		<echo>Filter HDFS Key List File : ${keyList}</echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${hadoopJarFile}" />
+			<arg value="reconcile.hbase.query.mr.DeleteIngest" />
+			<arg value="-source=${src}" />
+			<arg value="-keyList=${keyList}" />
+		</exec>
+	</target>
+
 	<target name="deleteRowsMR" depends="hadoopJar">
 		<!-- description="M/R job to delete rows with key OSC:" -->
 		<echo>Filter Source : ${src}</echo>
@@ -326,6 +381,18 @@
 			<arg value="reconcile.hbase.query.mr.DeleteLargeColumnFamily" />
 			<arg value="${table}" />
 			<arg value="${col}" />
+		</exec>
+	</target>
+	<target name="deleteSourceRows" depends="jars">
+		<!-- description="M/R job to delete rows with key OSC:" -->
+		<echo>table: ${table} </echo>
+		<echo>source name: ${src} </echo>
+		<exec executable="${hadoop}" spawn="false">
+			<arg value="jar" />
+			<arg value="${depJarFile}" />
+			<arg value="reconcile.hbase.query.mr.DeleteSourceRows" />
+			<arg value="${table}" />
+			<arg value="${src}" />
 		</exec>
 	</target>
 
@@ -376,106 +443,28 @@
 			<arg value="${src}" />
 		</exec>
 	</target>
-	<!-- ======================================================= -->
-	<!-- annotation tasks -->
-	<!-- ======================================================= -->
-	<target name="baseAnnot" depends="hadoopJar" description="execute base NLP annotations over entire doc table">
-		<echo>Filter Source : ${src}</echo>
-		<echo>Filter HDFS Key List File : ${keyList}</echo>
-		<exec executable="${hadoop}" spawn="false">
-			<arg value="jar" />
-			<arg value="${hadoopJarFile}" />
-			<arg value="reconcile.hbase.mapreduce.annotation.BaseReconcileAnnotation" />
-			<arg value="-source=${src}"/>
-			<arg value="-keyList=${keyList}" />
-		</exec>
-		<sleep seconds="10" />
-		<exec executable="${hadoop}">
-			<arg value="job" />
-			<arg value="-list" />
-		</exec>
-	</target>
 
-	<target name="parAnnot" depends="hadoopJar" description="paragraph annotations over entire doc table">
-		<exec executable="${hadoop}" spawn="false">
-			<arg value="jar" />
-			<arg value="${hadoopJarFile}" />
-			<arg value="trinidad.hbase.mapreduce.annotation.ParagraphAnnotation" />
-		</exec>
-	</target>
-	<target name="sentAnnot" depends="hadoopJar" description="sentence annotations over entire doc table">
-		<exec executable="${hadoop}" spawn="false">
-			<arg value="jar" />
-			<arg value="${hadoopJarFile}" />
-			<arg value="trinidad.hbase.mapreduce.annotation.SentenceAnnotation" />
-		</exec>
-	</target>
-	<target name="tokenAnnot" depends="hadoopJar" description="token annotations over entire doc table">
-		<exec executable="${hadoop}" spawn="false">
-			<arg value="jar" />
-			<arg value="${hadoopJarFile}" />
-			<arg value="trinidad.hbase.mapreduce.annotation.TokenAnnotation" />
-		</exec>
-	</target>
-	<target name="posAnnot" depends="hadoopJar" description="POS annotations over entire doc table">
-		<exec executable="${hadoop}" spawn="false">
-			<arg value="jar" />
-			<arg value="${hadoopJarFile}" />
-			<arg value="trinidad.hbase.mapreduce.annotation.POSAnnotation" />
-		</exec>
-	</target>
 
-	<target name="neAnnot" depends="hadoopJar" description="execute named entity annotations over  doc table">
-		<echo>Filter Source : ${src}</echo>
-		<echo>Filter HDFS Key List File : ${keyList}</echo>
+	<target name="printNPs" depends="hadoopJar" description="print the different types of treebank tag counts">
 		<exec executable="${hadoop}" spawn="false">
 			<arg value="jar" />
 			<arg value="${hadoopJarFile}" />
-			<arg value="reconcile.hbase.mapreduce.annotation.NEAnnotation" />
-			<arg value="-source=${src}"/>
-			<arg value="-keyList=${keyList}" />
-		</exec>
-	</target>
-
-	<target name="parserAnnot" depends="hadoopJar" description="execute parser annotations over doc table ">
-		<exec executable="${hadoop}" spawn="false">
-			<arg value="jar" />
-			<arg value="${hadoopJarFile}" />
-			<arg value="reconcile.hbase.mapreduce.annotation.ParserAnnotation" />
+			<arg value="reconcile.hbase.mapreduce.GenericMapper" />
 			<arg value="-source=${src}" />
 			<arg value="-keyList=${keyList}" />
+			<arg value="-family=annotations" />
+			<arg value="-family=text" />
+			<arg value="-mapper=reconcile.hbase.mapper.PrintNPs" />
 		</exec>
 	</target>
 
-	<target name="bnpAnnot" depends="hadoopJar" description="execute base NP annotations over doc table ">
+	<target name="countWords" depends="hadoopJar" description="execute coref annotations over doc table ">
 		<exec executable="${hadoop}" spawn="false">
 			<arg value="jar" />
 			<arg value="${hadoopJarFile}" />
-			<arg value="reconcile.hbase.mapreduce.annotation.BaseNPAnnotation" />
-			<arg value="-source=${src}" />
-			<arg value="-keyList=${keyList}" />
+			<arg value="reconcile.hbase.query.mr.CountParseWords" />
+			<arg value="${src}" />
 		</exec>
-	</target>
-
-	<target name="corefAnnot" depends="hadoopJar" description="execute coref annotations over doc table ">
-		<exec executable="${hadoop}" spawn="false">
-			<arg value="jar" />
-			<arg value="${hadoopJarFile}" />
-			<arg value="reconcile.hbase.mapreduce.annotation.CorefResolver" />
-			<arg value="-source=${src}" />
-			<arg value="-keyList=${keyList}" />
-		</exec>
-	</target>
-
-	<target name="annotate" depends="hadoopJar" description="Run all neccessary annotators">
-		<echo>Source name: ${src}</echo>
-		<echo>Key List File: ${keyList}</echo>
-		<antcall target="baseAnnot"/>
-		<antcall target="neAnnot"/>
-		<antcall target="parserAnnot"/>
-		<antcall target="bnpAnnot"/>
-		<antcall target="featureAnnot"/>
-
 	</target>
 
 	<target name="testZipInputFormat">
@@ -483,5 +472,17 @@
 			<param name="input" value="reconcile.hbase.mapreduce.ZipInputFormatTests"/>
 		</antcall>
 	</target>
-	
+
+	<target name="urlData" description="Get and print the data contents of specified url">
+		<echo>url     : ${url}</echo>
+		<echo>print   : ${print}</echo>
+		<echo>contains: ${contains}</echo>
+		<java fork="yes" classname="util.URLData" failonerror="true">
+			<classpath refid="classpath"/>
+			<arg value="-print=${print}" />
+			<arg value="-url=${url}"/>
+			<arg value="-contains=${contains}"/>
+		</java>
+	</target>
+
 </project>

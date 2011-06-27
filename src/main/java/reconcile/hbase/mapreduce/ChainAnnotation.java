@@ -18,9 +18,6 @@
  */
 package reconcile.hbase.mapreduce;
 
-import static reconcile.hbase.mapreduce.JobConfig.SOURCE_ARG;
-import static reconcile.hbase.mapreduce.JobConfig.SOURCE_NAME;
-
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -35,6 +32,8 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+
+import com.google.common.base.Joiner;
 
 import reconcile.hbase.mapreduce.ChainableAnnotationJob.AnnotateMapper;
 
@@ -73,16 +72,16 @@ public static void main(String[] args)
 
 }
 
-private HBaseConfiguration conf;
+private Configuration conf;
 
-private String source;
-
-public void init(String[] args, Job job, Scan scan)
+public void init(JobConfig jobConfig, Job job, Scan scan)
 {
 	StringBuffer mapperArg = new StringBuffer();
-  setSource(args, job);
-	for (String arg : args) {
-    if (arg.startsWith(JOB_ARG)) {
+
+	for (String arg : jobConfig.getArgs())
+	{
+		if (arg.startsWith(JOB_ARG))
+		{
 			String value = arg.substring(JOB_ARG.length());
 			if (!value.startsWith("$")) {
 				String[] vals = value.split(JOB_ARG_SEPARATOR);
@@ -93,7 +92,8 @@ public void init(String[] args, Job job, Scan scan)
 					for (int i=1; i<vals.length; ++i) {
 						jobArgs[i-1] = vals[i];
 					}
-					chainJob.init(jobArgs, job, scan);
+					JobConfig subJob = new JobConfig(jobArgs);
+					chainJob.init(subJob, job, scan);
 					if (mapperArg.length() > 0) {
 						mapperArg.append(",");
 					}
@@ -118,26 +118,13 @@ public void init(String[] args, Job job, Scan scan)
 	job.getConfiguration().set(ChainMapper.MAPPER_NAME_CONF, mappers);
 }
 
-public void setSource(String[] args, Job job)
-{
-  boolean set = false;
-  for (String arg : args) {
-    if (arg.startsWith(SOURCE_ARG)) {
-      source = arg.substring(SOURCE_ARG.length());
-      job.getConfiguration().set(SOURCE_NAME, source);
-      set = true;
-    }
-  }
-  if (!set) throw new RuntimeException("source must be set in args by: " + SOURCE_ARG + "<src name>");
-
-}
 
 @Override
 public int run(String[] args)
     throws Exception
 {
 
-  conf = new HBaseConfiguration();
+  conf = HBaseConfiguration.create();
 
 
   JobConfig jobConfig = new JobConfig(args);
@@ -150,11 +137,11 @@ public int run(String[] args)
     job.setNumReduceTasks(1);
     Scan scan = new Scan();
 
-    init(args, job, scan);
+    init(jobConfig, job, scan);
 
     jobConfig.initTableMapperNoReducer(LOG, job, scan, ChainMapper.class);
 
-    LOG.info("Started " + source);
+    LOG.info("Started (" + Joiner.on(",").join(args) + ")");
     job.waitForCompletion(true);
     LOG.info("After map/reduce completion");
 

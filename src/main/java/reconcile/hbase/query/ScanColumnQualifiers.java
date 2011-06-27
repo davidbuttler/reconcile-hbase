@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
@@ -52,7 +53,7 @@ public static void main(String[] args)
       columnFamily.add(args[i]);
     }
 
-    HBaseConfiguration config = new HBaseConfiguration();
+    Configuration config = HBaseConfiguration.create();
     HBaseAdmin admin = new HBaseAdmin(config);
 
     if (!admin.tableExists(table.getBytes())) {

@@ -14,6 +14,7 @@ package reconcile.hbase.query;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -52,7 +53,7 @@ public static void main(String[] args)
     columnFamily = args[1];
       columnQualifer = args[2];
 
-    HBaseConfiguration config = new HBaseConfiguration();
+    Configuration config = HBaseConfiguration.create();
     HBaseAdmin admin = new HBaseAdmin(config);
 
     if (!admin.tableExists(table.getBytes())) {

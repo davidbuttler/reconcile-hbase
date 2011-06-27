@@ -42,9 +42,15 @@ import junit.framework.TestSuite;
  */
 public class ZipInputFormatTests extends TestCase 
 {
+	public static boolean startedCorrectly = false;
+
+	private static final String saveMimeType = "text/plain";
+	
 	public static final String testPath = "/test/ZipInputFormatTests";
 	public static final String fileOne = "file-one.txt";
 	public static final String fileTwo = "file-two.txt";
+	public static final String fileThree = "file-three.txt";
+	public static final String fileFour = "file-four.textorama";
 	public static final String zipFile = "file.zip";
 	
 	public static final String jobOutputFile = "file-out.txt";
@@ -52,6 +58,25 @@ public class ZipInputFormatTests extends TestCase
 	
 	public static final String fileOneText = "This is the text contained within file one.";
 	public static final String fileTwoText = "Text in file two, ok????";
+	public static final String fileFourText = "Attention file four, attention file four";
+	
+	private static String textThree = null;
+	public static String fileThreeText() {
+		if (textThree==null) {
+			int length = ZipInputFormat.bufSize*3+10;
+			StringBuffer buffer = new StringBuffer();
+			char val = 'a';
+			for (int i=0; i<length; ++i) {
+				buffer.append(val);
+				++val;
+				if (!Character.isLowerCase(val)) {
+					val = 'a';
+				}
+			}
+			textThree = buffer.toString();
+		}
+		return textThree;
+	}
 	
 	public static String getFullPath(String name) {
 		return ResourceFile.HDFS_PREFIX+getHDFSPath(name);
@@ -80,7 +105,9 @@ public class ZipInputFormatTests extends TestCase
 	public void setUp()
 		throws IOException
 	{
-		HBaseConfiguration conf = new HBaseConfiguration();
+		if (!startedCorrectly) return;
+
+		Configuration conf = HBaseConfiguration.create();
 		FileSystem fs = FileSystem.get(conf);
 
 		Path dir = new Path(testPath);
@@ -92,32 +119,49 @@ public class ZipInputFormatTests extends TestCase
 		
 		writeFile(fileOne, fileOneText);
 		writeFile(fileTwo, fileTwoText);
+		writeFile(fileThree, fileThreeText());
+		writeFile(fileFour, fileFourText);
 
-		String[] args = { "-output="+getFullPath(zipFile), "-input="+getFullPath(fileOne), "-input="+getFullPath(fileTwo), "-gzipFiles=false" };
+		String[] args = { "-output="+getFullPath(zipFile), 
+				"-input="+getFullPath(fileOne), 
+				"-input="+getFullPath(fileTwo), 
+				"-input="+getFullPath(fileThree), 
+				"-input="+getFullPath(fileFour), 
+				"-gzipFiles=false" };
+		
 		FileArchiver.main(args);
 		
 		System.out.println("Zip file is created!  Setup is complete");
 	}
 	
 	@Override
+	
+	
 	public void tearDown()
-	{}
+	{
+		if (!startedCorrectly) return;
+	}
 	
 	public void testJob() throws Exception
 	{
+		if (!startedCorrectly) {
+			System.out.println("Skipping "+getClass().getSimpleName()+".testJob() as this was not started under hadoop");
+			return;
+		}
+		
 		FSDataInputStream is=null;
 		BufferedReader reader = null;
 		
 		String[] args = { getHDFSPath(zipFile), getHDFSPath(jobJunkFile) };
-		ToolRunner.run(new Configuration(), new TestJob(), args);
+		ToolRunner.run(new Configuration(), new TestZipInputFormatJob(), args);
 
 		// Validate contents of output file
-		HBaseConfiguration conf = new HBaseConfiguration();
+		Configuration conf = HBaseConfiguration.create();
 		FileSystem fs = FileSystem.get(conf);
 		
-		System.out.println("Output file:");
+		System.out.println("Output file("+jobOutputFile+"):");
 		int count=0;
-		boolean fileOneFound=false, fileTwoFound=false;
+		boolean fileOneFound=false, fileTwoFound=false, fileThreeFound=false, fileFourFound=false;
 		try {
 			is = fs.open(new Path(getHDFSPath(jobOutputFile)));
 			reader = new BufferedReader(new InputStreamReader(is));
@@ -125,11 +169,17 @@ public class ZipInputFormatTests extends TestCase
 			String line=null;
 			while ((line=reader.readLine())!=null) {
 				++count;
-				if (line.equals(fileOne+":"+fileOneText)) {
+				if (line.endsWith(fileOne+":"+fileOneText)) {
 					fileOneFound = true;
 				}
-				else if (line.equals(fileTwo+":"+fileTwoText)) {
+				else if (line.endsWith(fileTwo+":"+fileTwoText)) {
 					fileTwoFound = true;
+				}
+				else if (line.endsWith(fileThree+":"+fileThreeText())) {
+					fileThreeFound = true;
+				}
+				else if (line.contains(fileFour+":")) {
+					fileFourFound = true;
 				}
 			}
 		}
@@ -137,13 +187,17 @@ public class ZipInputFormatTests extends TestCase
 			IOUtils.closeQuietly(reader);
 			IOUtils.closeQuietly(is);
 		}
-		Assert.assertEquals(2, count);
+		Assert.assertEquals(3, count);
 		Assert.assertTrue(fileOneFound);
 		Assert.assertTrue(fileTwoFound);
+		Assert.assertTrue(fileThreeFound);
+		Assert.assertFalse(fileFourFound);
 	}
 	
 	public static void main(String[] args)
 	{
+		startedCorrectly = true;
+		
 		junit.framework.TestSuite suite = new TestSuite();
 		suite.addTestSuite(ZipInputFormatTests.class);
 
@@ -153,19 +207,20 @@ public class ZipInputFormatTests extends TestCase
 		System.out.println("Tests run:"+result.runCount()+" Errors:"+result.errorCount()+" Failed:"+result.failureCount());
 	}
 
-public static class TestJob extends Configured implements Tool {
+public static class TestZipInputFormatJob extends Configured implements Tool {
 
-	private HBaseConfiguration conf;
+	private Configuration conf;
 
-	public TestJob() 
+	public TestZipInputFormatJob() 
 	{}
 
 	public int run(String[] args)	
 	{
 		String inputPath = args[0];
 		String outputPath = args[1];
-		conf = new HBaseConfiguration();
+		conf = HBaseConfiguration.create();
 		conf.set("mapred.map.tasks.speculative.execution", "false");
+		conf.set(ZipInputFormat.PROCESS_MIME_TYPES_ONLY, saveMimeType);
 
 		try {
 

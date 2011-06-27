@@ -1,7 +1,17 @@
+/*
+ * Copyright (c) 2010, Lawrence Livermore National Security, LLC. Produced at the Lawrence Livermore National
+ * Laboratory. Written by Teresa Cottom, cottom1@llnl.gov CODE-400187 All rights reserved. This file is part of
+ * RECONCILE
+ *
+ * This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
+ * License (as published by the Free Software Foundation) version 2, dated June 1991. This program is distributed in the
+ * hope that it will be useful, but WITHOUT ANY WARRANTY; without even the IMPLIED WARRANTY OF MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the terms and conditions of the GNU General Public License for more details.
+ * You should have received a copy of the GNU General Public License along with this program; if not, write to the Free
+ * Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA For full text see license.txt
+ */
 package reconcile.hbase.mapreduce;
 
-import static reconcile.hbase.mapreduce.JobConfig.SOURCE_ARG;
-import static reconcile.hbase.mapreduce.JobConfig.SOURCE_NAME;
 import static reconcile.hbase.mapreduce.annotation.AnnotationUtils.getAnnotationStr;
 
 import java.io.IOException;
@@ -10,6 +20,7 @@ import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Put;
@@ -21,7 +32,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.Tool;
 
 import reconcile.data.AnnotationSet;
-import reconcile.hbase.mapreduce.JobConfig.Mapper;
 import reconcile.hbase.table.DocSchema;
 
 public abstract class ChainableAnnotationJob extends Configured implements Tool
@@ -35,7 +45,7 @@ public abstract class ChainableAnnotationJob extends Configured implements Tool
 	 * @author cottom1
 	 *
 	 */
-	public static abstract class AnnotateMapper extends Mapper<Put>
+	public static abstract class AnnotateMapper extends DocMapper<Put>
 	{
 		/*
 		 * Simply overridden to make map public
@@ -82,15 +92,28 @@ public abstract class ChainableAnnotationJob extends Configured implements Tool
 		}
 	}
 
-	/**
-	 * Initialize the M/R job and HBase scan based on command-line arguments
-	 *
-	 * @param args
-	 * @param job
-	 * @param scan
-	 */
-	public abstract void init(String[] args, Job job, Scan scan);
+/**
+ * Initialize the M/R job and HBase scan based on command-line arguments. Common items to set in this method:
+ * <ul>
+ * <li>scan (start, stop, filter)
+ * <li>parameters that the child map jobs might need
+ * <li>scanner caching (default is pushed to 1 to compute-bound tasks; I/O bound tasks could go to 10000)
+ * </ul>
+ * 
+ * @param args
+ * @param job
+ * @param scan
+ */
+	public abstract void init(JobConfig jobConfig, Job job, Scan scan);
 
+	/**
+	 * Any post M/R job work
+	 */
+	public void finish()
+	{
+		LOG.info("not overridden. No post M/R tasks to complete.");
+	}
+	
 	/**
 	 * Get the class to run as the Mapper
 	 * @return
@@ -99,15 +122,13 @@ public abstract class ChainableAnnotationJob extends Configured implements Tool
 
 	public static final Log LOG = LogFactory.getLog(ChainableAnnotationJob.class);
 
-	private HBaseConfiguration conf;
-
-protected String source;
+private Configuration conf;
 
 	@Override
 	public int run(String[] args)
 	    throws Exception
 	{
-	  conf = new HBaseConfiguration();
+		conf = HBaseConfiguration.create();
 	  // important to switch spec exec off.
 	  // We don't want to have something duplicated for perfomance reasons.
 	  conf.set("mapred.map.tasks.speculative.execution", "false");
@@ -117,6 +138,9 @@ protected String source;
 
 	  JobConfig jobConfig = new JobConfig(args);
 
+	  Scan scan = new Scan();
+
+	  int status = 0;
 	  try {
 
 	    LOG.info("Before map/reduce startup");
@@ -124,36 +148,25 @@ protected String source;
 	    Job job = new Job(conf, getClass().getSimpleName());
 	    job.setJarByClass(this.getClass());
 
-	    Scan scan = new Scan();
-
-	    init(args, job, scan);
+	    init(jobConfig, job, scan);
 
 	    jobConfig.initTableMapperNoReducer(LOG, job, scan, getMapperClass());
 
-    LOG.info("Started " + source);
+	    LOG.info("Started ");
 	    job.waitForCompletion(true);
+	    if (!job.isSuccessful())
+	    	status = 1;
 	    LOG.info("After map/reduce completion");
+	    
+	    finish();
 	  }
 	  catch (Exception e) {
 	    e.printStackTrace();
-	    return 1;
+	    status = 1;
 	  }
 
-	  return 0;
+	  LOG.info("Return run status(0=success,1=failure)("+status+")");
+	  return status;
 	}
-
-public void setSource(String[] args, Job job)
-{
-  boolean set = false;
-  for (String arg : args) {
-    if (arg.startsWith(SOURCE_ARG)) {
-      source = arg.substring(SOURCE_ARG.length());
-      job.getConfiguration().set(SOURCE_NAME, source);
-      set = true;
-    }
-  }
-  if (!set) throw new RuntimeException("source must be set in args by: " + SOURCE_ARG + "<src name>");
-
-}
 
 }

@@ -15,6 +15,7 @@ package reconcile.hbase.query;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -41,7 +42,7 @@ private static String family;
     family = args[1];
     int tick = Integer.parseInt(args[2]);
 
-    HBaseConfiguration conf = new HBaseConfiguration();
+    Configuration conf = HBaseConfiguration.create();
     HTable table = new HTable(conf, tableName.getBytes());
 
     System.out.println("scanning full table:");

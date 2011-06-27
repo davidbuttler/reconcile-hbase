@@ -15,6 +15,7 @@ import org.apache.hadoop.util.ToolRunner;
 import com.google.common.base.Charsets;
 
 import reconcile.hbase.mapreduce.ChainableAnnotationJob;
+import reconcile.hbase.mapreduce.JobConfig;
 import reconcile.hbase.table.DocSchema;
 
 public class DeleteIngest extends ChainableAnnotationJob {
@@ -45,7 +46,7 @@ public static void main(String[] args)
 
 
 @Override
-public void init(String[] args, Job job, Scan scan)
+public void init(JobConfig jobConfig, Job job, Scan scan)
 {
 
 }
@@ -59,8 +60,6 @@ public Class<? extends AnnotateMapper> getMapperClass()
 public static class DeleteIngestMapper
     extends AnnotateMapper {
 
-private DocSchema table;
-
 private Pattern ingestPattern;
 
 @Override
@@ -69,8 +68,6 @@ public void setup(Context context)
   try {
     super.setup(context);
     LOG.info("Only deleting entries with source("+getSourceName()+")");
-
-    table = new DocSchema(getSourceName());
     ingestPattern = Pattern.compile("2010.*");
   }
   catch (IOException e) {
@@ -82,15 +79,6 @@ public void setup(Context context)
 
 }
 
-@Override
-protected void cleanup(Context context1)
-    throws IOException, InterruptedException
-{
-  if (table != null) {
-    table.flushCommits();
-    table.close();
-  }
-}
 
 /**
  * Pass the key, value to reduce.
@@ -128,7 +116,7 @@ public void map(ImmutableBytesWritable key, Result rr, Context context)
       }
 		}
     if (deleted) {
-      table.delete(delete);
+      docTable.delete(delete);
     }
 	}
 }

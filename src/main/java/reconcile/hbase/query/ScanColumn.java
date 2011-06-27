@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2008, Lawrenimport java.io.IOException;
- * 
+ *
  * import org.apache.hadoop.hbase.HBaseConfiguration; import org.apache.hadoop.hbase.KeyValue; import
  * org.apache.hadoop.hbase.MasterNotRunningException; import org.apache.hadoop.hbase.client.HBaseAdmin; import
  * org.apache.hadoop.hbase.client.HTable; import org.apache.hadoop.hbase.client.Result; import
@@ -15,6 +15,7 @@ package reconcile.hbase.query;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
@@ -84,7 +85,7 @@ public static void main(String[] args)
     table = args[0];
 
     // Initialize query objects
-    HBaseConfiguration config = new HBaseConfiguration();
+    Configuration config = HBaseConfiguration.create();
     HBaseAdmin admin = new HBaseAdmin(config);
 
     if (!admin.tableExists(table.getBytes())) {
@@ -105,7 +106,7 @@ public static void main(String[] args)
 
     	    if (col.getQualifier()==null) {
             	System.out.println("setting fetch ("+col.getFamily()+")");
-    	        s.addColumn(Bytes.toBytes(col.getFamily()));
+          s.addFamily(Bytes.toBytes(col.getFamily()));
     	    }
     	    else {
             	System.out.println("setting fetch ("+col.getFamily()+")("+col.getQualifier()+")");

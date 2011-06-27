@@ -25,18 +25,21 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import reconcile.hbase.query.FiltersTests;
-
 import reconcile.hbase.table.DocSchema;
+import reconcile.hbase.table.DocSchemaTest;
 
 import junit.framework.Assert;
 import junit.framework.TestCase;
 import junit.framework.TestResult;
 import junit.framework.TestSuite;
+import junit.textui.TestRunner;
 
 public class KeyListInputFormatTests extends TestCase 
 {
+	public static boolean startedCorrectly = false;
+
 	public static final String testPath = "/test/KeyListInputFormatTests";
+
 	Path testFile;
 	Path outputFile;
 	Path junkFile;
@@ -44,7 +47,9 @@ public class KeyListInputFormatTests extends TestCase
 	@Override
 	public void setUp()
 	{
-		HBaseConfiguration conf = new HBaseConfiguration();
+		if (!startedCorrectly) return;
+		
+		Configuration conf = HBaseConfiguration.create();
 		try {
 			FileSystem fs = FileSystem.get(conf);
 			Path dir = new Path(testPath);
@@ -61,7 +66,9 @@ public class KeyListInputFormatTests extends TestCase
 	@Override
 	public void tearDown()
 	{
-		HBaseConfiguration conf = new HBaseConfiguration();
+		if (!startedCorrectly) return;
+
+		Configuration conf = HBaseConfiguration.create();
 		try {
 			FileSystem fs = FileSystem.get(conf);
 			fs.delete(junkFile, true);
@@ -73,19 +80,23 @@ public class KeyListInputFormatTests extends TestCase
 	
 	public void testJob() throws Exception
 	{
+		if (!startedCorrectly) {
+			System.out.println("Skipping "+getClass().getSimpleName()+".testJob() as this was not started under hadoop");
+			return;
+		}
 		FSDataInputStream is=null;
 		BufferedReader reader = null;
 		
-		FiltersTests.createKeysFile(testFile);
+		createKeysFile(testFile);
 		
 		String[] args = { testFile.toString(), junkFile.toString() };
-		ToolRunner.run(new Configuration(), new TestJob(), args);
+		ToolRunner.run(new Configuration(), new TestKeyListInputFormatJob(), args);
 
 		// Validate contents of output file
-		HBaseConfiguration conf = new HBaseConfiguration();
+		Configuration conf = HBaseConfiguration.create();
 		FileSystem fs = FileSystem.get(conf);
 		
-		boolean gtFound=false, pubmedFound=false;
+		boolean found=false;
 		int numLines = 0;
 		try {
 			is = fs.open(outputFile);
@@ -93,13 +104,9 @@ public class KeyListInputFormatTests extends TestCase
 		
 			String line=null;
 			while ((line=reader.readLine())!=null) {
-				if (line.startsWith(FiltersTests.GT_DOC_KEY)) {
-					Assert.assertTrue(line.endsWith(":GT2009"));
-					gtFound = true;
-				}
-				else if (line.startsWith(FiltersTests.PUBMED_DOC_KEY)) {
-					Assert.assertTrue(line.endsWith(":PubMed"));
-					pubmedFound = true;
+				if (line.startsWith(DocSchemaTest.key)) {
+					Assert.assertTrue(line.endsWith(":"+DocSchemaTest.tableName));
+					found = true;
 				}
 				++numLines;
 			}
@@ -108,34 +115,55 @@ public class KeyListInputFormatTests extends TestCase
 			IOUtils.closeQuietly(reader);
 			IOUtils.closeQuietly(is);
 		}
-		Assert.assertEquals(2, numLines);  // should only be two entries
-		Assert.assertTrue(gtFound);
-		Assert.assertTrue(pubmedFound);
+		Assert.assertEquals(1, numLines);  // should only be two entries
+		Assert.assertTrue(found);
 	}
 	
 	public static void main(String[] args)
 	{
+		startedCorrectly = true;
+		
 		junit.framework.TestSuite suite = new TestSuite();
 		suite.addTestSuite(KeyListInputFormatTests.class);
 
-		TestResult result = new TestResult();
-		suite.run(result);
-		
-		System.out.println("Tests run:"+result.runCount()+" Errors:"+result.errorCount()+" Failed:"+result.failureCount());
+		TestRunner runner = new TestRunner(System.out);
+		TestResult result = runner.doRun(suite, false);
+
+		System.out.println("Hadoop Test run:"+result.runCount()+" Errors:"+result.errorCount()+" Failed:"+result.failureCount());
 	}
 
-public static class TestJob extends Configured implements Tool {
+	
+    public static void createKeysFile(Path file)
+    	throws IOException
+    {
+    	Configuration conf = HBaseConfiguration.create();
+    	FileSystem fs = FileSystem.get(conf);
+    	FSDataOutputStream os = null;
+    	try {
+            os = fs.create(file, true);
+            os.writeBytes(DocSchemaTest.key+"\n");
+            os.flush();
+    	}
+    	finally {
+            if (os!=null) {
+            	os.close();
+            }
+    	}
+    }
 
-	private HBaseConfiguration conf;
+	
+public static class TestKeyListInputFormatJob extends Configured implements Tool {
 
-	public TestJob() 
+	private Configuration conf;
+
+	public TestKeyListInputFormatJob() 
 	{}
 
 	public int run(String[] args)	
 	{
 		String inputPath = args[0];
 		String outputPath = args[1];
-		conf = new HBaseConfiguration();
+		conf = HBaseConfiguration.create();
 		conf.set("mapred.map.tasks.speculative.execution", "false");
 
 		try {
@@ -148,7 +176,9 @@ public static class TestJob extends Configured implements Tool {
 			job.setInputFormatClass(KeyListInputFormat.class);
 			job.setMapOutputKeyClass(ImmutableBytesWritable.class);
 			job.setMapOutputValueClass(Result.class);
-
+			
+			job.getConfiguration().set(JobConfig.TABLE_CONF, DocSchemaTest.tableName);
+			
 			FileInputFormat.addInputPath(job, new Path(inputPath));
 			FileOutputFormat.setOutputPath(job, new Path(outputPath));
 			

@@ -1,8 +1,9 @@
 /*
+ * 
  * Copyright (c) 2008, Lawrence Livermore National Security, LLC. Produced at the Lawrence Livermore National
  * Laboratory. Written by David Buttler, buttler1@llnl.gov CODE-400187 All rights reserved. This file is part of
  * RECONCILE
- *
+ * 
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
  * License (as published by the Free Software Foundation) version 2, dated June 1991. This program is distributed in the
  * hope that it will be useful, but WITHOUT ANY WARRANTY; without even the IMPLIED WARRANTY OF MERCHANTABILITY or
@@ -85,7 +86,7 @@ public static void main(String[] args)
 
 }
 
-private HBaseConfiguration conf;
+private Configuration conf;
 
 public ParseNYT() {
 
@@ -95,7 +96,7 @@ private static String tableName = "NYT";
 
 public int run(String[] args)
 {
-  conf = new HBaseConfiguration();
+  conf = HBaseConfiguration.create();
   // important to switch spec exec off.
   // We don't want to have something duplicated.
   conf.set("mapred.map.tasks.speculative.execution", "false");

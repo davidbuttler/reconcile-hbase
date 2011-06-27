@@ -4,9 +4,15 @@
   <groupId>reconcile</groupId>
   <artifactId>reconcile-hbase</artifactId>
   <packaging>jar</packaging>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <name>reconcile-hbase</name>
   <url>http://maven.apache.org</url>
+  
+  
+<properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+     
   <dependencies>
 
 <dependency>
@@ -23,24 +29,40 @@
 
     <dependency>
       <groupId>reconcile</groupId>
-      <artifactId>reconcile</artifactId>
-      <version>1.0.0</version>
+      <artifactId>reconcile-data</artifactId>
+      <version>1.1.0</version>
     </dependency>
 
-    <dependency>
-			<groupId>org.apache</groupId>
-			<artifactId>hbase</artifactId>
-			<version>0.20.6</version>
-		</dependency>
+<dependency>
+  <groupId>org.apache.hbase</groupId>
+  <artifactId>hbase</artifactId>
+  <version>0.90.1</version>
+</dependency>
+
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-core</artifactId>
 			<version>0.20.2-cloudera-320</version>
-		</dependency> 
+		</dependency>
+		 
 <dependency>
   <groupId>org.apache.zookeeper</groupId>
   <artifactId>zookeeper</artifactId>
-  <version>3.3.1</version>
+  <version>3.3.2</version>
+</dependency>
+
+
+<dependency>
+  <groupId>org.apache.lucene</groupId>
+  <artifactId>lucene-snowball</artifactId>
+  <version>2.9.3</version>
+</dependency>
+
+
+<dependency>
+  <groupId>com.google.code.gson</groupId>
+  <artifactId>gson</artifactId>
+  <version>1.4</version>
 </dependency>
 
 <dependency>
@@ -74,6 +96,12 @@
 </dependency>
 
 <dependency>
+  <groupId>commons-configuration</groupId>
+  <artifactId>commons-configuration</artifactId>
+  <version>1.5</version>
+</dependency>
+
+<dependency>
   <groupId>log4j</groupId>
   <artifactId>log4j</artifactId>
   <version>1.2.9</version>
@@ -91,6 +119,12 @@
   <version>1.4.3</version>
 </dependency>
 
+<!-- Used to download RSS/atom feeds -->
+<dependency>    
+  <groupId>rome</groupId>   
+  <artifactId>rome</artifactId>
+  <version>0.9</version>
+</dependency>
  
 <dependency>
   <groupId>findbugs</groupId>
@@ -107,6 +141,14 @@
   </dependencies>
   
   	<build>
+		<resources>
+			<resource>
+				<directory>${env.HADOOP_HOME}/conf</directory>
+			</resource>
+			<resource>
+				<directory>${env.HBASE_HOME}/conf</directory>
+			</resource>
+		</resources>
 		<plugins>
 			<plugin>
 				<artifactId>maven-compiler-plugin</artifactId>

@@ -267,10 +267,14 @@ public String getAnnotString(int start, int end)
 {
   String result = null;
 
+  if (end >= mText.length()) {
+    end = mText.length();
+  }
   try {
     result = getText().substring(start, end);
   }
   catch (StringIndexOutOfBoundsException siobe) {
+    System.err.println("text length: " + mText.length());
     int st = mText.length() - 20;
     for (int i = st; i < mText.length(); i++) {
       System.err.println(i + ":" + mText.charAt(i));

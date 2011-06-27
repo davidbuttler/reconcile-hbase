@@ -29,13 +29,7 @@ public class GenericMapper extends ChainableAnnotationJob {
 
 
 /**
- *
- * @param args
- *          :
- *          <ol>
- *          <li>optional source argument to limit the rows to tag
- *          <li>-keyListFile=<hdfs file containing keys> optional argument to specify processing of only select rows
- *          </ol>
+ * @see JobConfig#JobConfig
  */
 public static void main(String[] args)
 {

@@ -71,7 +71,7 @@ public int run(String[] args)
     System.out.println("usage: SizeColumnFamily <table name> <column family>");
     return 1;
   }
-  HBaseConfiguration conf = new HBaseConfiguration();
+  Configuration conf = HBaseConfiguration.create();
 
   try {
     String tableName = args[0];
@@ -124,8 +124,8 @@ public void setup(Context context)
     columnFamily = context.getConfiguration().get(COLUMN_FAMILY);
 
     String tableName = context.getConfiguration().get(TABLE_NAME);
-    HBaseConfiguration config = new HBaseConfiguration();
-    table = new HTable(config, tableName.getBytes());
+    Configuration conf = HBaseConfiguration.create();
+    table = new HTable(conf, tableName.getBytes());
   }
   catch (IOException e) {
     e.printStackTrace();

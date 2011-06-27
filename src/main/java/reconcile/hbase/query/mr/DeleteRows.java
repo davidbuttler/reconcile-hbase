@@ -12,6 +12,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.ToolRunner;
 
 import reconcile.hbase.mapreduce.ChainableAnnotationJob;
+import reconcile.hbase.mapreduce.JobConfig;
 import reconcile.hbase.table.DocSchema;
 
 public class DeleteRows extends ChainableAnnotationJob {
@@ -44,10 +45,11 @@ public static void main(String[] args)
 public static final String CF_ARG = "-cf=";
 
 @Override
-public void init(String[] args, Job job, Scan scan)
+public void init(JobConfig jobConfig, Job job, Scan scan)
 {
 	StringBuffer deleteCF = new StringBuffer("");
-	for (String arg : args) {
+	for (String arg : jobConfig.getArgs())
+	{
 		if (arg.startsWith(CF_ARG)) {
 			String value = arg.substring(CF_ARG.length());
 			if (value.length() > 0 && !value.startsWith("$")) {
@@ -66,7 +68,6 @@ public Class<? extends AnnotateMapper> getMapperClass()
 
 public static class DeleteRowMapper extends AnnotateMapper {
 
-private DocSchema table;
 private TreeSet<String> deleteCFs = new TreeSet<String>();
 
 @Override
@@ -76,7 +77,6 @@ public void setup(Context context)
     super.setup(context);
     LOG.info("Only deleting entries with source("+getSourceName()+")");
 
-    table = new DocSchema(getSourceName());
     deleteCFs = new TreeSet<String>();
     String value = context.getConfiguration().get(DELETE_CFS);
     if (value!=null && value.length() > 0) {
@@ -96,15 +96,6 @@ public void setup(Context context)
 
 }
 
-@Override
-protected void cleanup(Context context1)
-    throws IOException, InterruptedException
-{
-  if (table != null) {
-    table.flushCommits();
-    table.close();
-  }
-}
 
 /**
  * Pass the key, value to reduce.
@@ -135,7 +126,7 @@ public void map(ImmutableBytesWritable key, Result rr, Context context)
 			delete.deleteFamily(cf.getBytes());
 			context.getCounter(contextHeader(), "delete column family("+cf+")").increment(1);
 		}
-		table.delete(delete);
+    docTable.delete(delete);
 	}
 }
 

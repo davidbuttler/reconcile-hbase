@@ -1,6 +1,7 @@
 package reconcile.hbase.table;
 
 import static org.apache.hadoop.hbase.HColumnDescriptor.DEFAULT_BLOCKCACHE;
+import static org.apache.hadoop.hbase.HColumnDescriptor.DEFAULT_BLOOMFILTER;
 import static org.apache.hadoop.hbase.HColumnDescriptor.DEFAULT_IN_MEMORY;
 import static org.apache.hadoop.hbase.HColumnDescriptor.DEFAULT_TTL;
 import static org.apache.hadoop.hbase.HColumnDescriptor.DEFAULT_VERSIONS;
@@ -13,10 +14,12 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -31,6 +34,8 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.solr.schema.DateField;
 import org.apache.tools.ant.filters.StringInputStream;
+
+import com.google.common.base.Charsets;
 
 import reconcile.data.AnnotationReaderBytespan;
 import reconcile.data.AnnotationSet;
@@ -190,7 +195,7 @@ public String getTableName()
 protected final void createTable()
     throws IOException
 {
-  HBaseConfiguration conf = new HBaseConfiguration();
+  Configuration conf = HBaseConfiguration.create();
   HConnection connector = HConnectionManager.getConnection(conf);
   createTable(connector);
 
@@ -205,20 +210,20 @@ protected final void createTable()
 protected void createTable(HConnection connector)
     throws IOException
 {
-  if (connector.tableExists(myTableName.getBytes())) return;
 
-  HBaseConfiguration config = new HBaseConfiguration();
-  HBaseAdmin admin = new HBaseAdmin(config);
+  Configuration conf = HBaseConfiguration.create();
+  HBaseAdmin admin = new HBaseAdmin(conf);
+  if (admin.tableExists(myTableName.getBytes())) return;
 
   HTableDescriptor docDesc = new HTableDescriptor(myTableName.getBytes());
   docDesc.addFamily(new HColumnDescriptor(srcCF.getBytes(), DEFAULT_VERSIONS, "GZ", DEFAULT_IN_MEMORY,
-      DEFAULT_BLOCKCACHE, DEFAULT_TTL, false));
+      DEFAULT_BLOCKCACHE, DEFAULT_TTL, DEFAULT_BLOOMFILTER));
   docDesc.addFamily(new HColumnDescriptor(metaCF.getBytes(), DEFAULT_VERSIONS, "GZ", DEFAULT_IN_MEMORY,
-      DEFAULT_BLOCKCACHE, DEFAULT_TTL, false));
+      DEFAULT_BLOCKCACHE, DEFAULT_TTL, DEFAULT_BLOOMFILTER));
   docDesc.addFamily(new HColumnDescriptor(textCF.getBytes(), DEFAULT_VERSIONS, "GZ", DEFAULT_IN_MEMORY,
-      DEFAULT_BLOCKCACHE, DEFAULT_TTL, false));
+      DEFAULT_BLOCKCACHE, DEFAULT_TTL, DEFAULT_BLOOMFILTER));
   docDesc.addFamily(new HColumnDescriptor(annotationsCF.getBytes(), DEFAULT_VERSIONS, "GZ", DEFAULT_IN_MEMORY,
-      DEFAULT_BLOCKCACHE, DEFAULT_TTL, false));
+      DEFAULT_BLOCKCACHE, DEFAULT_TTL, DEFAULT_BLOOMFILTER));
 
   admin.createTable(docDesc);
 
@@ -226,11 +231,24 @@ protected void createTable(HConnection connector)
 }
 
 
+public static final String COUNT_REGIONS_ARG="-getRegionCount";
+
 public static void main(String[] args)
 {
-  try {
-    System.out.println("Create table named: " + args[0]);
-    DocSchema d = new DocSchema(args[0], true);
+	String tableName = args[0];
+
+	try {
+	  	for (String arg : args) {
+	  		if (arg.equals(COUNT_REGIONS_ARG)) {
+	  			DocSchema doc = new DocSchema(tableName);
+	  			int numRegions = doc.getNumberOfRegions();
+	  			System.out.println("There are ("+numRegions+") regions in table("+tableName+")");
+	  			return;
+	  		}
+	  	}
+
+	  	System.out.println("Create table named: " + tableName);
+	  	new DocSchema(tableName, true);
   }
   catch (IOException e) {
     e.printStackTrace();
@@ -331,17 +349,34 @@ public static AnnotationSet getAnnotationSet(Result row, String annotationSetNam
   }
 }
 
+public static AnnotationSet getAnnotationSet(KeyValue kv)
+{
+  try {
+    AnnotationSet annotationSet = null;
+    byte[] bytes = kv.getValue();
+    if (bytes == null || bytes.length == 0) return null;
+    String parseStr = new String(bytes, HConstants.UTF8_ENCODING);
+    annotationSet = reader.read(new StringInputStream(parseStr), new String(kv.getQualifier(), Charsets.UTF_8));
+    return annotationSet;
+  }
+  catch (UnsupportedEncodingException e) {
+    e.printStackTrace();
+    throw new RuntimeException(e);
+  }
+}
+
 private static final DateField dateField = new DateField();
 public static String formatSolrDate(Date date)
 {
+	if (date==null) return null;
 	return dateField.toInternal(date)+"Z";
 }
 
 public static void addIngestDate(Put put)
 {
 	Date time = Calendar.getInstance().getTime();
-    String ingestDate = formatSolrDate(time);
-    put.add(metaCF.getBytes(), ingestDate.getBytes(), ingestDate.getBytes());
+    String ingestDateValue = formatSolrDate(time);
+    put.add(metaCF.getBytes(), ingestDate.getBytes(), ingestDateValue.getBytes());
 }
 
 public static void add(Put put, String col, String qual, String data)
@@ -390,15 +425,16 @@ public DocSchema(String tableName, boolean attemptCreateTable)
 private void init(String tableName, boolean attemptCreateTable)
 	throws IOException
 {
+	if (tableName == null) throw new IOException("table name must not be null");
 	tableName = tableName.trim();
+	if (tableName.length()==0) throw new IOException("table name must not be empty");
 	myTableName = tableName;
-	if (tableName == null || tableName.equals("")) throw new IOException("table name must not be null");
 
 	if (attemptCreateTable) {
     createTable();
   }
 
-	HBaseConfiguration config = new HBaseConfiguration();
+	Configuration config = HBaseConfiguration.create();
 	mTable = new HTable(config, myTableName.getBytes());
 
 	if (mTable == null) throw new NullPointerException("HTable is null for table name("+myTableName+")");
@@ -413,13 +449,17 @@ public HTable getTable()
 public void flushCommits()
     throws IOException
 {
-  mTable.flushCommits();
+  if (mTable != null) {
+    mTable.flushCommits();
+  }
 }
 public void close()
     throws IOException
 {
-  mTable.flushCommits();
-  mTable.close();
+  if (mTable != null) {
+    mTable.flushCommits();
+    mTable.close();
+  }
 }
 
 public void put(Put p)
@@ -462,10 +502,10 @@ public boolean exists(byte[] row)
 	Get get = new Get(row);
 	try {
 		return mTable.exists(get);
-	} 
+	}
 	catch (IOException e) {
 		e.printStackTrace();
-	}	
+	}
 	return false;
 }
 
@@ -498,7 +538,7 @@ public boolean addReference(Put put, String referenceRowId)
 			alreadyExists = true;
 
 			// Track if this particular reference has been 'seen' before
-			if (previousReference.contains(referenceRowId)) {
+      if (previousReference != null && previousReference.contains(referenceRowId)) {
 				alreadyContains = true;
 			}
 		}
@@ -518,5 +558,18 @@ public boolean addReference(Put put, String referenceRowId)
 
     return alreadyExists;
 }
+
+/**
+ * Computes the number of regions per table.
+ *
+ * @return The total number of regions per table.
+ * @throws IOException When the table is not created.
+ */
+public int getNumberOfRegions()
+	throws IOException
+{
+	return mTable.getStartKeys().length;
+}
+
 
 }

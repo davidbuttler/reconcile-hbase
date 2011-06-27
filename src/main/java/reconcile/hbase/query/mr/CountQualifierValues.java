@@ -81,7 +81,7 @@ public int run(String[] args)
 
     return 1;
   }
-  HBaseConfiguration conf = new HBaseConfiguration();
+  Configuration conf = HBaseConfiguration.create();
 
   try {
     table = args[0];
